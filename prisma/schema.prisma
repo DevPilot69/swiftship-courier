@@ -1,0 +1,126 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String     @id @default(cuid())
+  name         String
+  email        String     @unique
+  phone        String     @unique
+  passwordHash String
+  isVerified   Boolean    @default(false)
+  shipments    Shipment[]
+  createdAt    DateTime   @default(now())
+}
+
+model OTPRecord {
+  id             String     @id @default(cuid())
+  userId         String?
+  target         String
+  code           String
+  type           OTPType
+  purpose        OTPPurpose
+  expiresAt      DateTime
+  used           Boolean    @default(false)
+  failedAttempts Int        @default(0)
+  createdAt      DateTime   @default(now())
+}
+
+model Shipment {
+  id                String          @id @default(cuid())
+  awbNumber         String          @unique
+  userId            String
+  user              User            @relation(fields: [userId], references: [id])
+  shipmentType      ShipmentType
+  senderName        String
+  senderPhone       String
+  senderEmail       String
+  originPincode     String
+  originCity        String
+  originState       String
+  senderAddress     String
+  receiverName      String
+  receiverPhone     String
+  receiverEmail     String
+  destPincode       String
+  destCity          String
+  destState         String
+  destCountry       String          @default("India")
+  receiverAddress   String
+  parcelType        ParcelType
+  weight            Float
+  length            Float?
+  breadth           Float?
+  height            Float?
+  declaredValue     Float
+  serviceType       ServiceType
+  baseCharge        Float
+  taxAmount         Float
+  totalAmount       Float
+  paymentId         String?
+  paymentStatus     PaymentStatus   @default(PENDING)
+  status            ShipmentStatus  @default(BOOKED)
+  trackingEvents    TrackingEvent[]
+  bookedAt          DateTime        @default(now())
+  estimatedDelivery DateTime
+}
+
+model TrackingEvent {
+  id          String         @id @default(cuid())
+  shipmentId  String
+  shipment    Shipment       @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  status      ShipmentStatus
+  location    String
+  description String
+  timestamp   DateTime       @default(now())
+}
+
+enum OTPType {
+  PHONE
+  EMAIL
+}
+
+enum OTPPurpose {
+  REGISTER
+  LOGIN
+  VERIFY
+}
+
+enum ShipmentType {
+  DOMESTIC
+  INTERNATIONAL
+}
+
+enum ParcelType {
+  DOCUMENT
+  PARCEL
+  HEAVY
+}
+
+enum ServiceType {
+  STANDARD
+  EXPRESS
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+enum ShipmentStatus {
+  BOOKED
+  PICKUP_SCHEDULED
+  PICKED_UP
+  IN_TRANSIT
+  OUT_FOR_DELIVERY
+  DELIVERED
+  CANCELLED
+}
