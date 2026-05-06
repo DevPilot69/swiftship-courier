@@ -4,7 +4,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { motion } from "framer-motion";
 import { signIn } from "next-auth/react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import * as React from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
@@ -35,7 +34,6 @@ function maskEmail(email: string) {
 }
 
 export function RegisterForm() {
-  const router = useRouter();
   const [step, setStep] = React.useState<1 | 2>(1);
   const [userId, setUserId] = React.useState<string | null>(null);
   const [phoneOtp, setPhoneOtp] = React.useState("");
@@ -220,7 +218,11 @@ export function RegisterForm() {
         toast.error("Could not sign in");
         return;
       }
-      router.push("/dashboard");
+      if (!res?.ok) {
+        toast.error("Could not sign in. Try again.");
+        return;
+      }
+      window.location.assign("/dashboard");
     }
   }
 

@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { motion } from "framer-motion";
 import { signIn } from "next-auth/react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import * as React from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
@@ -33,7 +33,6 @@ const phonePwdSchema = z.object({
 });
 
 export function LoginForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") ?? "/dashboard";
 
@@ -67,6 +66,10 @@ export function LoginForm() {
     return () => clearInterval(t);
   }, [cooldownPhone]);
 
+  function gotoAfterSignIn() {
+    window.location.assign(callbackUrl);
+  }
+
   async function submitEmailPwd(v: z.infer<typeof emailPwdSchema>) {
     const res = await signIn("credentials", {
       redirect: false,
@@ -78,7 +81,11 @@ export function LoginForm() {
       toast.error("Invalid email or password");
       return;
     }
-    router.push(callbackUrl);
+    if (!res?.ok) {
+      toast.error("Could not sign in. Try again.");
+      return;
+    }
+    gotoAfterSignIn();
   }
 
   async function submitPhonePwd(v: z.infer<typeof phonePwdSchema>) {
@@ -92,7 +99,11 @@ export function LoginForm() {
       toast.error("Invalid phone or password");
       return;
     }
-    router.push(callbackUrl);
+    if (!res?.ok) {
+      toast.error("Could not sign in. Try again.");
+      return;
+    }
+    gotoAfterSignIn();
   }
 
   async function sendEmailOtp() {
@@ -173,7 +184,11 @@ export function LoginForm() {
         toast.error("Could not sign in");
         return;
       }
-      router.push(callbackUrl);
+      if (!res?.ok) {
+        toast.error("Could not sign in. Try again.");
+        return;
+      }
+      gotoAfterSignIn();
     }
   }
 
@@ -205,7 +220,11 @@ export function LoginForm() {
         toast.error("Could not sign in");
         return;
       }
-      router.push(callbackUrl);
+      if (!res?.ok) {
+        toast.error("Could not sign in. Try again.");
+        return;
+      }
+      gotoAfterSignIn();
     }
   }
 

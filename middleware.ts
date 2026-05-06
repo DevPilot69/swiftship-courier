@@ -2,11 +2,21 @@ import { getToken } from "next-auth/jwt";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
+/** Auth.js v5 uses `__Secure-authjs.session-token` on HTTPS production; dev uses `authjs.session-token`. */
+function sessionCookieName() {
+  return process.env.NODE_ENV === "production"
+    ? "__Secure-authjs.session-token"
+    : "authjs.session-token";
+}
+
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
+  const secret =
+    process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET;
   const token = await getToken({
     req,
-    secret: process.env.NEXTAUTH_SECRET,
+    secret,
+    cookieName: sessionCookieName(),
   });
   const loggedIn = !!token;
 
