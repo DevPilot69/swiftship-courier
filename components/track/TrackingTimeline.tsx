@@ -30,10 +30,12 @@ type Props = {
   originCity: string;
   destCity: string;
   estimatedDelivery: string;
-  events: Event[];
+  /** Tracking steps from `/api/track/[awb]` (`events` field). */
+  events?: Event[];
 };
 
 export function TrackingTimeline(data: Props) {
+  const events = data.events ?? [];
   const cancelled = data.status === "CANCELLED";
 
   return (
@@ -64,14 +66,14 @@ export function TrackingTimeline(data: Props) {
       <div className="relative pl-6">
         <div className="absolute left-[7px] top-0 bottom-0 w-px bg-[#E5E7EB]" />
         {(cancelled
-          ? data.events.map((ev) => ({
+          ? events.map((ev) => ({
               status: ev.status,
               description: ev.description,
               location: ev.location,
               time: ev.timestamp,
               done: true,
             }))
-          : buildMergedTimeline(data)
+          : buildMergedTimeline({ ...data, events })
         ).map((row, i) => (
           <div key={`${row.status}-${i}`} className="relative mb-6">
             <div

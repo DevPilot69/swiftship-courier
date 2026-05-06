@@ -33,7 +33,7 @@ export async function GET(
     destState: shipment.destState,
     destCountry: shipment.destCountry,
     estimatedDelivery: shipment.estimatedDelivery.toISOString(),
-    trackingEvents: shipment.trackingEvents.map((e) => ({
+    events: shipment.trackingEvents.map((e) => ({
       status: e.status,
       location: e.location,
       description: e.description,
