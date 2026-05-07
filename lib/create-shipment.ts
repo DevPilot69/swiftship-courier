@@ -11,7 +11,10 @@ import BookingConfirmation from "@/emails/BookingConfirmation";
 import { generateUniqueAwb } from "@/lib/awb";
 import { prisma } from "@/lib/prisma";
 import { calculateRate, volumetricWeightKg } from "@/lib/rate-engine";
-import { isDemoPaymentPayload } from "@/lib/demo-payments";
+import {
+  isDemoPaymentsEnabled,
+  isDemoShapedPayment,
+} from "@/lib/demo-payments";
 import { getFromEmail, getResend } from "@/lib/resend";
 import { getRazorpay } from "@/lib/razorpay";
 import { sendSms } from "@/lib/twilio";
@@ -50,7 +53,10 @@ export async function createPaidShipment(
     return { error: "Unauthorized", status: 401 };
   }
 
-  const demoPayment = isDemoPaymentPayload(data);
+  const rp = getRazorpay();
+  const demoPayment =
+    isDemoShapedPayment(data) &&
+    (isDemoPaymentsEnabled() || rp === null);
 
   if (!demoPayment) {
     const okSig = verifyRazorpaySignature(
@@ -93,7 +99,6 @@ export async function createPaidShipment(
   if (demoPayment) {
     paidPaise = expectedPaise;
   } else {
-    const rp = getRazorpay();
     if (!rp) {
       return { error: "Payments not configured", status: 503 };
     }

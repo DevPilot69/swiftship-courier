@@ -14,21 +14,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid amount" }, { status: 400 });
   }
 
-  if (isDemoPaymentsEnabled()) {
+  const rp = getRazorpay();
+  if (isDemoPaymentsEnabled() || !rp) {
     return NextResponse.json({
       orderId: createDemoOrderId(),
       amount: amountPaise,
       currency: "INR",
       demo: true,
     });
-  }
-
-  const rp = getRazorpay();
-  if (!rp) {
-    return NextResponse.json(
-      { error: "Razorpay is not configured" },
-      { status: 503 },
-    );
   }
 
   const receipt = `ss_${session.user.id.slice(0, 8)}_${Date.now()}`;
