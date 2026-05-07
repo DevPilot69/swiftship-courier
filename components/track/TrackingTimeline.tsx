@@ -124,7 +124,7 @@ function buildMergedTimeline(data: Props): Array<{
   done: boolean;
 }> {
   const map = new Map<ShipmentStatus, Event>();
-  for (const e of data.events) {
+  for (const e of data.events ?? []) {
     map.set(e.status, e);
   }
   const currentIdx = ORDER.indexOf(data.status);
