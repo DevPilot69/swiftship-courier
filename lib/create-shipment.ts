@@ -11,6 +11,7 @@ import BookingConfirmation from "@/emails/BookingConfirmation";
 import { generateUniqueAwb } from "@/lib/awb";
 import { prisma } from "@/lib/prisma";
 import { calculateRate, volumetricWeightKg } from "@/lib/rate-engine";
+import { isDemoPaymentPayload } from "@/lib/demo-payments";
 import { getFromEmail, getResend } from "@/lib/resend";
 import { getRazorpay } from "@/lib/razorpay";
 import { sendSms } from "@/lib/twilio";
@@ -49,13 +50,17 @@ export async function createPaidShipment(
     return { error: "Unauthorized", status: 401 };
   }
 
-  const okSig = verifyRazorpaySignature(
-    data.razorpayOrderId,
-    data.razorpayPaymentId,
-    data.razorpaySignature,
-  );
-  if (!okSig) {
-    return { error: "Invalid payment signature", status: 400 };
+  const demoPayment = isDemoPaymentPayload(data);
+
+  if (!demoPayment) {
+    const okSig = verifyRazorpaySignature(
+      data.razorpayOrderId,
+      data.razorpayPaymentId,
+      data.razorpaySignature,
+    );
+    if (!okSig) {
+      return { error: "Invalid payment signature", status: 400 };
+    }
   }
 
   let chargeableWeightKg = data.weight;
@@ -83,23 +88,28 @@ export async function createPaidShipment(
   });
 
   const expectedPaise = Math.round(rate.totalAmount * 100);
-  const rp = getRazorpay();
-  if (!rp) {
-    return { error: "Payments not configured", status: 503 };
-  }
   let paidPaise = expectedPaise;
-  try {
-    const payment = await rp.payments.fetch(data.razorpayPaymentId);
-    if (payment.status !== "captured" && payment.status !== "authorized") {
-      return { error: "Payment not completed", status: 400 };
-    }
-    paidPaise = Number(payment.amount);
-  } catch {
-    return { error: "Could not verify payment with Razorpay", status: 400 };
-  }
 
-  if (paidPaise < expectedPaise) {
-    return { error: "Paid amount does not match quote", status: 400 };
+  if (demoPayment) {
+    paidPaise = expectedPaise;
+  } else {
+    const rp = getRazorpay();
+    if (!rp) {
+      return { error: "Payments not configured", status: 503 };
+    }
+    try {
+      const payment = await rp.payments.fetch(data.razorpayPaymentId);
+      if (payment.status !== "captured" && payment.status !== "authorized") {
+        return { error: "Payment not completed", status: 400 };
+      }
+      paidPaise = Number(payment.amount);
+    } catch {
+      return { error: "Could not verify payment with Razorpay", status: 400 };
+    }
+
+    if (paidPaise < expectedPaise) {
+      return { error: "Paid amount does not match quote", status: 400 };
+    }
   }
 
   const awb = await generateUniqueAwb();

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
+import { createDemoOrderId, isDemoPaymentsEnabled } from "@/lib/demo-payments";
 import { getRazorpay } from "@/lib/razorpay";
 
 export async function POST(req: Request) {
@@ -11,6 +12,15 @@ export async function POST(req: Request) {
   const amountPaise = Number(body?.amountPaise);
   if (!Number.isFinite(amountPaise) || amountPaise < 100) {
     return NextResponse.json({ error: "Invalid amount" }, { status: 400 });
+  }
+
+  if (isDemoPaymentsEnabled()) {
+    return NextResponse.json({
+      orderId: createDemoOrderId(),
+      amount: amountPaise,
+      currency: "INR",
+      demo: true,
+    });
   }
 
   const rp = getRazorpay();

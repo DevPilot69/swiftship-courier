@@ -73,7 +73,16 @@ export default function HomePage() {
         </section>
 
         <section className="border-t border-[#E5E7EB] bg-white py-14">
-          <div className="mx-auto grid max-w-6xl gap-8 px-4 md:grid-cols-3">
+          <div className="mx-auto max-w-6xl px-4">
+            <h2 className="text-center font-heading text-2xl font-bold text-[#1A1A1A] md:text-3xl">
+              Why SwiftShip
+            </h2>
+            <p className="mx-auto mt-2 max-w-2xl text-center text-sm text-[#6B7280] md:text-base">
+              Everything you need for fast, transparent deliveries — from
+              booking to doorstep.
+            </p>
+          </div>
+          <div className="mx-auto mt-10 grid max-w-6xl gap-8 px-4 md:grid-cols-3">
             {[
               {
                 icon: Package,

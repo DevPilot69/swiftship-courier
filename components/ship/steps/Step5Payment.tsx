@@ -6,6 +6,58 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useBookingStore } from "@/store/useBookingStore";
+import type { BookingWizardState } from "@/types";
+
+function buildVerifyPayload(
+  s: BookingWizardState,
+  razorpayOrderId: string,
+  razorpayPaymentId: string,
+  razorpaySignature: string,
+) {
+  return {
+    shipmentType: s.shipmentType,
+    senderName: s.senderName,
+    senderPhone: s.senderPhone,
+    senderEmail: s.senderEmail,
+    originPincode: s.originPincode,
+    originCity: s.originCity,
+    originState: s.originState,
+    senderAddress: s.senderAddress,
+    receiverName: s.receiverName,
+    receiverPhone: s.receiverPhone,
+    receiverEmail: s.receiverEmail,
+    destPincode: s.destPincode,
+    destCity: s.destCity,
+    destState: s.destState,
+    destCountry: s.destCountry,
+    receiverAddress: s.receiverAddress,
+    parcelType: s.parcelType,
+    weight: s.weight,
+    length: s.length,
+    breadth: s.breadth,
+    height: s.height,
+    declaredValue: s.declaredValue,
+    serviceType: s.serviceType,
+    razorpayOrderId,
+    razorpayPaymentId,
+    razorpaySignature,
+  };
+}
+
+async function verifyAndFinish(
+  payload: ReturnType<typeof buildVerifyPayload>,
+): Promise<{ ok: boolean; awb?: string; error?: string }> {
+  const v = await fetch("/api/payments/verify", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const j = await v.json().catch(() => ({}));
+  if (!v.ok) {
+    return { ok: false, error: typeof j.error === "string" ? j.error : "Verification failed" };
+  }
+  return { ok: true, awb: typeof j.awb === "string" ? j.awb : undefined };
+}
 
 function loadRazorpay(): Promise<boolean> {
   return new Promise((resolve) => {
@@ -41,12 +93,6 @@ export function Step5Payment() {
       return;
     }
     setBusy(true);
-    const ready = await loadRazorpay();
-    if (!ready || !window.Razorpay) {
-      toast.error("Could not load payment gateway");
-      setBusy(false);
-      return;
-    }
     const amountPaise = Math.round(s.rateBreakdown.totalAmount * 100);
     const orderRes = await fetch("/api/payments/order", {
       method: "POST",
@@ -56,6 +102,34 @@ export function Step5Payment() {
     const orderJson = await orderRes.json().catch(() => ({}));
     if (!orderRes.ok) {
       toast.error(orderJson.error ?? "Could not create order");
+      setBusy(false);
+      return;
+    }
+
+    if (orderJson.demo === true) {
+      const demoPaymentId = `demo_pay_${crypto.randomUUID()}`;
+      const payload = buildVerifyPayload(
+        s,
+        orderJson.orderId as string,
+        demoPaymentId,
+        "demo",
+      );
+      const result = await verifyAndFinish(payload);
+      if (!result.ok || !result.awb) {
+        toast.error(result.error ?? "Could not complete booking");
+        setBusy(false);
+        return;
+      }
+      toast.success(`Shipment booked! AWB: ${result.awb}`);
+      useBookingStore.getState().reset();
+      router.push("/dashboard/orders");
+      setBusy(false);
+      return;
+    }
+
+    const ready = await loadRazorpay();
+    if (!ready || !window.Razorpay) {
+      toast.error("Could not load payment gateway");
       setBusy(false);
       return;
     }
@@ -76,46 +150,19 @@ export function Step5Payment() {
       },
       theme: { color: "#CC2027" },
       handler: async (response) => {
-        const payload = {
-          shipmentType: s.shipmentType,
-          senderName: s.senderName,
-          senderPhone: s.senderPhone,
-          senderEmail: s.senderEmail,
-          originPincode: s.originPincode,
-          originCity: s.originCity,
-          originState: s.originState,
-          senderAddress: s.senderAddress,
-          receiverName: s.receiverName,
-          receiverPhone: s.receiverPhone,
-          receiverEmail: s.receiverEmail,
-          destPincode: s.destPincode,
-          destCity: s.destCity,
-          destState: s.destState,
-          destCountry: s.destCountry,
-          receiverAddress: s.receiverAddress,
-          parcelType: s.parcelType,
-          weight: s.weight,
-          length: s.length,
-          breadth: s.breadth,
-          height: s.height,
-          declaredValue: s.declaredValue,
-          serviceType: s.serviceType,
-          razorpayOrderId: response.razorpay_order_id,
-          razorpayPaymentId: response.razorpay_payment_id,
-          razorpaySignature: response.razorpay_signature,
-        };
-        const v = await fetch("/api/payments/verify", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-        const j = await v.json().catch(() => ({}));
-        if (!v.ok) {
-          toast.error(j.error ?? "Payment verification failed");
+        const payload = buildVerifyPayload(
+          s,
+          response.razorpay_order_id,
+          response.razorpay_payment_id,
+          response.razorpay_signature,
+        );
+        const result = await verifyAndFinish(payload);
+        if (!result.ok || !result.awb) {
+          toast.error(result.error ?? "Payment verification failed");
           setBusy(false);
           return;
         }
-        toast.success(`Shipment booked! AWB: ${j.awb}`);
+        toast.success(`Shipment booked! AWB: ${result.awb}`);
         useBookingStore.getState().reset();
         router.push("/dashboard/orders");
       },
@@ -127,8 +174,17 @@ export function Step5Payment() {
     setBusy(false);
   }
 
+  const demoUi =
+    process.env.NEXT_PUBLIC_DEMO_PAYMENTS === "true";
+
   return (
     <div className="space-y-6">
+      {demoUi && (
+        <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          Demo mode: payment is simulated. Unique demo order and payment IDs are
+          generated; Razorpay is not used.
+        </p>
+      )}
       {s.rateBreakdown && (
         <Card>
           <CardHeader>
@@ -162,7 +218,8 @@ export function Step5Payment() {
           disabled={busy || !s.rateBreakdown}
           onClick={pay}
         >
-          Pay {s.rateBreakdown ? fmt.format(s.rateBreakdown.totalAmount) : ""}
+          {demoUi ? "Complete booking (demo)" : "Pay"}{" "}
+          {s.rateBreakdown ? fmt.format(s.rateBreakdown.totalAmount) : ""}
         </Button>
       </div>
     </div>
